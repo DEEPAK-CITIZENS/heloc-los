@@ -1,17 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
-
-const esignApi = axios.create({ baseURL: '/esign-api', headers: { 'Content-Type': 'application/json' } })
-
-async function sendForSigning(applicationId) {
-  const { data } = await esignApi.post('/esign/send', { applicationId })
-  return data
-}
-
-async function getSigningStatus(applicationId) {
-  const { data } = await esignApi.get(`/esign/status/${applicationId}`)
-  return data
-}
+import { sendForSigning, getEsignStatus } from '../api/helocApi'
 
 export default function ESignPanel({ appId }) {
   const [status, setStatus]     = useState(null)
@@ -22,7 +10,7 @@ export default function ESignPanel({ appId }) {
 
   useEffect(() => {
     setLoading(true)
-    getSigningStatus(appId)
+    getEsignStatus(appId)
       .then(setStatus)
       .catch(() => setStatus(null))
       .finally(() => setLoading(false))
@@ -32,7 +20,7 @@ export default function ESignPanel({ appId }) {
     if (!polling || !status) return
     const timer = setInterval(async () => {
       try {
-        const updated = await getSigningStatus(appId)
+        const updated = await getEsignStatus(appId)
         setStatus(updated)
         if (updated?.status === 'COMPLETED' || updated?.status === 'DECLINED') {
           setPolling(false)

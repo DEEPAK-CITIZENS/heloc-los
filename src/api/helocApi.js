@@ -1,8 +1,51 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '/api', headers: { 'Content-Type': 'application/json' } })
+// ── Shared error interceptor ────────────────────────────────────────────────
+function attachInterceptor(instance, label) {
+  instance.interceptors.response.use(
+    response => response,
+    error => {
+      const { config, response } = error
+      if (response) {
+        console.error(
+          `[${label}] ${config?.method?.toUpperCase()} ${config?.url} → ${response.status}`,
+          response.data
+        )
+      } else {
+        console.error(`[${label}] ${config?.method?.toUpperCase()} ${config?.url} → Network Error`, error.message)
+      }
+      return Promise.reject(error)
+    }
+  )
+  return instance
+}
 
-// HELOC Application CRUD
+const api = attachInterceptor(
+  axios.create({ baseURL: '/api', headers: { 'Content-Type': 'application/json' } }),
+  'HELOC-API'
+)
+
+const lienApi = attachInterceptor(
+  axios.create({ baseURL: '/lien-api', headers: { 'Content-Type': 'application/json' } }),
+  'LIEN-API'
+)
+
+const esignApi = attachInterceptor(
+  axios.create({ baseURL: '/esign-api', headers: { 'Content-Type': 'application/json' } }),
+  'ESIGN-API'
+)
+
+const portfolioApi = attachInterceptor(
+  axios.create({ baseURL: '/portfolio-api', headers: { 'Content-Type': 'application/json' } }),
+  'PORTFOLIO-API'
+)
+
+const preapprovalApi = attachInterceptor(
+  axios.create({ baseURL: '/preapproval-api', headers: { 'Content-Type': 'application/json' } }),
+  'PREAPPROVAL-API'
+)
+
+// ── HELOC Application CRUD ──────────────────────────────────────────────────
 export function submitApplication(payload) {
   return api.post('/heloc-application', payload).then(r => r.data)
 }
@@ -16,7 +59,7 @@ export function reprocessApplication(id, ssn) {
   return api.post(`/heloc-application/${id}/reprocess`, { ssn }).then(r => r.data)
 }
 
-// Document upload (same pattern as auto-loan)
+// ── Documents ───────────────────────────────────────────────────────────────
 export async function uploadDocument(appId, documentType, file) {
   const formData = new FormData()
   formData.append('documentType', documentType)
@@ -31,7 +74,7 @@ export async function getDocuments(appId) {
   return data
 }
 
-// Pre-qualification & Deal Structuring
+// ── Pre-qualification & Deal Structuring ────────────────────────────────────
 export function preQualify(payload) {
   return api.post('/heloc-pre-qual', payload).then(r => r.data)
 }
@@ -42,7 +85,7 @@ export function getAllApplications() {
   return api.get('/heloc-application?all=true').then(r => r.data)
 }
 
-// Counter-Offer & Adverse Action
+// ── Counter-Offer & Adverse Action ──────────────────────────────────────────
 export function getCounterOffer(id) {
   return api.get(`/heloc-application/${id}/counter-offer`).then(r => r.data)
 }
@@ -50,8 +93,7 @@ export function getAdverseActionNoticeUrl(id) {
   return `/api/heloc-application/${id}/adverse-action-notice`
 }
 
-// Lien Recording (replaces Title Transfer)
-const lienApi = axios.create({ baseURL: '/lien-api', headers: { 'Content-Type': 'application/json' } })
+// ── Lien Recording (replaces Title Transfer from auto-loan) ─────────────────
 export async function initiateLienRecording(payload) {
   const { data } = await lienApi.post('/lien-recording', payload)
   return data
@@ -61,8 +103,7 @@ export async function getLienRecording(applicationId) {
   return data
 }
 
-// E-Sign
-const esignApi = axios.create({ baseURL: '/esign-api', headers: { 'Content-Type': 'application/json' } })
+// ── E-Sign ──────────────────────────────────────────────────────────────────
 export async function sendForSigning(applicationId) {
   const { data } = await esignApi.post('/esign/send', { applicationId })
   return data
@@ -72,15 +113,13 @@ export async function getEsignStatus(applicationId) {
   return data
 }
 
-// Portfolio Analytics
-const portfolioApi = axios.create({ baseURL: '/portfolio-api', headers: { 'Content-Type': 'application/json' } })
+// ── Portfolio Analytics ─────────────────────────────────────────────────────
 export async function getPortfolioMetrics() {
   const { data } = await portfolioApi.get('/heloc-portfolio/metrics')
   return data
 }
 
-// Pre-Approval
-const preapprovalApi = axios.create({ baseURL: '/preapproval-api', headers: { 'Content-Type': 'application/json' } })
+// ── Pre-Approval ────────────────────────────────────────────────────────────
 export async function getPreApprovalOffers() {
   const { data } = await preapprovalApi.get('/heloc-pre-approval/offers')
   return data
@@ -92,4 +131,14 @@ export async function generatePreApprovalOffers(request = {}) {
 export async function redeemPreApprovalOffer(offerCode) {
   const { data } = await preapprovalApi.post(`/heloc-pre-approval/redeem/${offerCode}`)
   return data
+}
+
+// ── Health Check ────────────────────────────────────────────────────────────
+export async function healthCheck() {
+  try {
+    await api.get('/heloc-application', { timeout: 5000 })
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, status: err.response?.status, message: err.response?.data?.message || err.message }
+  }
 }

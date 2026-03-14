@@ -79,6 +79,61 @@ export async function getPortfolioMetrics() {
   return data
 }
 
+// Credit Decisioning
+const creditApi = axios.create({ baseURL: '/credit-api', headers: { 'Content-Type': 'application/json' } })
+export async function runCreditDecision(payload) {
+  const { data } = await creditApi.post('/credit-decision', payload)
+  return data
+}
+export async function getCreditDecision(applicationId) {
+  const { data } = await creditApi.get(`/credit-decision/${applicationId}`)
+  return data
+}
+
+// Property Appraisal
+const appraisalApi = axios.create({ baseURL: '/appraisal-api', headers: { 'Content-Type': 'application/json' } })
+export async function runPropertyAppraisal(payload) {
+  const { data } = await appraisalApi.post('/property-appraisal', payload)
+  return data
+}
+export async function getPropertyAppraisal(applicationId) {
+  const { data } = await appraisalApi.get(`/property-appraisal/${applicationId}`)
+  return data
+}
+
+// Underwriting
+const underwritingApi = axios.create({ baseURL: '/underwriting-api', headers: { 'Content-Type': 'application/json' } })
+export async function runUnderwriting(payload) {
+  const { data } = await underwritingApi.post('/underwriting', payload)
+  return data
+}
+export async function getUnderwritingResult(applicationId) {
+  const { data } = await underwritingApi.get(`/underwriting/${applicationId}`)
+  return data
+}
+
+// HELOC Booking
+const bookingApi = axios.create({ baseURL: '/booking-api', headers: { 'Content-Type': 'application/json' } })
+export async function bookHeloc(payload) {
+  const { data } = await bookingApi.post('/booked-heloc', payload)
+  return data
+}
+export async function getBookedHeloc(applicationId) {
+  const { data } = await bookingApi.get(`/booked-heloc/${applicationId}`)
+  return data
+}
+
+// OFAC Screening
+const ofacApi = axios.create({ baseURL: '/ofac-api', headers: { 'Content-Type': 'application/json' } })
+export async function runOfacScreening(payload) {
+  const { data } = await ofacApi.post('/ofac-screening', payload)
+  return data
+}
+export async function getOfacScreening(applicationId) {
+  const { data } = await ofacApi.get(`/ofac-screening/${applicationId}`)
+  return data
+}
+
 // Pre-Approval
 const preapprovalApi = axios.create({ baseURL: '/preapproval-api', headers: { 'Content-Type': 'application/json' } })
 export async function getPreApprovalOffers() {

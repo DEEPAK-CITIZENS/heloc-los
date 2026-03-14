@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import PropertyValuePanel from './PropertyValuePanel'
 
@@ -34,6 +34,68 @@ function NavLink({ to, children }) {
     >
       {children}
     </Link>
+  )
+}
+
+// ── Services Dropdown ────────────────────────────────────────────────────────
+const SERVICE_LINKS = [
+  { to: '/services/credit-decisioning',  label: 'Credit Decisioning',  port: '9091' },
+  { to: '/services/property-appraisal',  label: 'Property Appraisal',  port: '9092' },
+  { to: '/services/underwriting',        label: 'Underwriting',        port: '9093' },
+  { to: '/services/heloc-booking',       label: 'HELOC Booking',       port: '9094' },
+  { to: '/services/lien-recording',      label: 'Lien Recording',     port: '9095' },
+  { to: '/services/ofac-screening',      label: 'OFAC Screening',     port: '9096' },
+  { to: '/services/esign',               label: 'eSign',              port: '9098' },
+]
+
+function ServicesDropdown() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const { pathname } = useLocation()
+  const active = pathname.startsWith('/services')
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`relative text-sm font-medium pb-0.5 transition-colors duration-150 flex items-center gap-1
+          ${active
+            ? 'text-citizens-green after:absolute after:bottom-[-2px] after:left-0 after:right-0 after:h-0.5 after:bg-citizens-green after:rounded-full'
+            : 'text-gray-600 hover:text-citizens-green'
+          }`}
+      >
+        Services
+        <svg className={`w-3 h-3 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+          {SERVICE_LINKS.map(s => (
+            <Link
+              key={s.to}
+              to={s.to}
+              onClick={() => setOpen(false)}
+              className={`flex items-center justify-between px-4 py-2 text-sm hover:bg-citizens-green-pale transition-colors ${
+                pathname === s.to ? 'text-citizens-green font-medium bg-citizens-green-pale' : 'text-gray-700'
+              }`}
+            >
+              <span>{s.label}</span>
+              <span className="text-xs text-gray-400 font-mono">:{s.port}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -222,6 +284,7 @@ export default function Header() {
             <NavLink to="/applications">Applications</NavLink>
             <NavLink to="/portfolio">Portfolio</NavLink>
             <NavLink to="/config">Config</NavLink>
+            <ServicesDropdown />
 
             {/* Calculator toggle */}
             <RibbonBtn

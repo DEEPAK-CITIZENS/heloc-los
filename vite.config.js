@@ -43,6 +43,21 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/lien-api/, '/lien-recording-service/1.0')
         },
+        '/credit-api': {
+          target: 'http://localhost:9091',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/credit-api/, '/credit-decisioning-service/1.0')
+        },
+        '/underwriting-api': {
+          target: 'http://localhost:9093',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/underwriting-api/, '/underwriting-service/1.0')
+        },
+        '/booking-api': {
+          target: 'http://localhost:9094',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/booking-api/, '/heloc-booking-service/1.0')
+        },
       }
     }
   }

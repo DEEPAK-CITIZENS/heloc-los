@@ -1,35 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { submitApplication } from '../api/helocApi'
 import ProvePanel from '../components/ProvePanel'
-import PropertyImage from '../components/PropertyImage'
 
+const STEPS = ['Applicant', 'Property', 'HELOC']
 const DRAFTS_KEY = 'pilot_heloc_drafts'
-
-function saveDraft(draftId, stepReached, firstName, lastName) {
-  try {
-    const drafts = JSON.parse(localStorage.getItem(DRAFTS_KEY) || '[]')
-    const idx = drafts.findIndex(d => d.id === draftId)
-    const entry = {
-      id: draftId,
-      stepReached,
-      applicantFirstName: firstName,
-      applicantLastName: lastName,
-      startedAt: idx >= 0 ? drafts[idx].startedAt : new Date().toISOString(),
-      lastUpdatedAt: new Date().toISOString(),
-    }
-    if (idx >= 0) drafts[idx] = entry
-    else drafts.push(entry)
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts))
-  } catch { /* ignore */ }
-}
-
-function removeDraft(draftId) {
-  try {
-    const drafts = JSON.parse(localStorage.getItem(DRAFTS_KEY) || '[]')
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts.filter(d => d.id !== draftId)))
-  } catch { /* ignore */ }
-}
 
 const INITIAL_APPLICANT = {
   firstName: '', lastName: '', dob: '', ssn: '', email: '', phone: '',
@@ -42,40 +17,81 @@ const INITIAL_PROPERTY = {
 }
 const INITIAL_HELOC = { requestedCreditLine: '', drawPeriodYears: '10', repaymentPeriodYears: '20', intendedUse: 'HOME_IMPROVEMENT' }
 
-const STEP_LABELS = ['Applicant', 'Property', 'HELOC']
-
-function Input({ label, value, onChange, type = 'text', placeholder, required }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
-      <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-citizens-green focus:border-citizens-green"
-      />
-    </div>
-  )
+function readDrafts() {
+  try { return JSON.parse(localStorage.getItem(DRAFTS_KEY)) || [] } catch { return [] }
+}
+function saveDraft(id, stepReached, firstName, lastName) {
+  const drafts = readDrafts()
+  const now = new Date().toISOString()
+  const idx = drafts.findIndex(d => d.id === id)
+  const entry = {
+    id, stepReached,
+    applicantFirstName: firstName, applicantLastName: lastName,
+    startedAt: idx >= 0 ? drafts[idx].startedAt : now,
+    lastUpdatedAt: now
+  }
+  if (idx >= 0) drafts[idx] = entry; else drafts.push(entry)
+  localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts))
+}
+function removeDraft(id) {
+  localStorage.setItem(DRAFTS_KEY, JSON.stringify(readDrafts().filter(d => d.id !== id)))
 }
 
-function Select({ label, value, onChange, options, required }) {
+function safeFloat(val) {
+  const n = parseFloat(val)
+  return isNaN(n) ? null : n
+}
+function safeInt(val) {
+  const n = parseInt(val, 10)
+  return isNaN(n) ? null : n
+}
+
+function validatePayload(applicant, property, heloc) {
+  if (safeFloat(applicant.annualIncome) === null || safeFloat(applicant.annualIncome) <= 0) {
+    return 'Please enter a valid annual income greater than zero.'
+  }
+  if (safeFloat(applicant.monthlyHousingPayment) === null || safeFloat(applicant.monthlyHousingPayment) < 0) {
+    return 'Please enter a valid monthly housing payment.'
+  }
+  if (safeFloat(property.estimatedPropertyValue) === null || safeFloat(property.estimatedPropertyValue) <= 0) {
+    return 'Please enter a valid estimated property value.'
+  }
+  if (safeFloat(property.currentMortgageBalance) === null || safeFloat(property.currentMortgageBalance) < 0) {
+    return 'Please enter a valid current mortgage balance.'
+  }
+  if (safeInt(property.yearBuilt) === null || safeInt(property.yearBuilt) < 1800 || safeInt(property.yearBuilt) > new Date().getFullYear()) {
+    return 'Please enter a valid year built.'
+  }
+  if (safeInt(property.squareFootage) === null || safeInt(property.squareFootage) <= 0) {
+    return 'Please enter a valid square footage.'
+  }
+  if (safeFloat(property.propertyTaxAnnual) === null || safeFloat(property.propertyTaxAnnual) < 0) {
+    return 'Please enter a valid annual property tax amount.'
+  }
+  if (safeFloat(property.homeInsuranceAnnual) === null || safeFloat(property.homeInsuranceAnnual) < 0) {
+    return 'Please enter a valid annual home insurance amount.'
+  }
+  if (safeFloat(heloc.requestedCreditLine) === null || safeFloat(heloc.requestedCreditLine) <= 0) {
+    return 'Please enter a valid requested credit line amount.'
+  }
+  if (safeInt(heloc.drawPeriodYears) === null) {
+    return 'Please select a draw period.'
+  }
+  if (safeInt(heloc.repaymentPeriodYears) === null) {
+    return 'Please select a repayment period.'
+  }
+  const cltv = (safeFloat(property.currentMortgageBalance) + safeFloat(heloc.requestedCreditLine)) / safeFloat(property.estimatedPropertyValue)
+  if (cltv > 1.0) {
+    return 'Combined loan-to-value (CLTV) exceeds 100%. Please reduce the credit line or check your property value.'
+  }
+  return null
+}
+
+function Field({ label, children }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-citizens-green"
-      >
-        {options.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
+      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{label}</label>
+      {children}
     </div>
   )
 }
@@ -83,245 +99,241 @@ function Select({ label, value, onChange, options, required }) {
 export default function NewApplicationPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const preApproval = location.state?.preApproval
+  const preApproval = location.state?.preApproval ?? null
 
-  const [step, setStep]           = useState(0)
-  const [applicant, setApplicant] = useState(() => {
+  const [step, setStep] = useState(0)
+  const [applicant, setApplicant] = useState(INITIAL_APPLICANT)
+  const [property, setProperty] = useState(INITIAL_PROPERTY)
+  const [heloc, setHeloc] = useState(INITIAL_HELOC)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [showProve, setShowProve] = useState(true)
+  const [draftId] = useState(() => crypto.randomUUID())
+
+  useEffect(() => {
     if (preApproval) {
-      return { ...INITIAL_APPLICANT, firstName: preApproval.firstName ?? '', lastName: preApproval.lastName ?? '' }
+      if (preApproval.firstName || preApproval.lastName) {
+        setApplicant(prev => ({ ...prev, firstName: preApproval.firstName ?? '', lastName: preApproval.lastName ?? '' }))
+      }
+      if (preApproval.preApprovedAmount) setHeloc(prev => ({ ...prev, requestedCreditLine: String(preApproval.preApprovedAmount) }))
     }
-    return { ...INITIAL_APPLICANT }
-  })
-  const [property, setProperty]   = useState({ ...INITIAL_PROPERTY })
-  const [heloc, setHeloc]         = useState(() => {
-    if (preApproval?.preApprovedAmount) {
-      return { ...INITIAL_HELOC, requestedCreditLine: String(preApproval.preApprovedAmount) }
-    }
-    return { ...INITIAL_HELOC }
-  })
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError]           = useState(null)
-  const [draftId] = useState(() => `draft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`)
+  }, [preApproval])
 
-  function updateApplicant(field, value) {
-    setApplicant(prev => ({ ...prev, [field]: value }))
-  }
-  function updateProperty(field, value) {
-    setProperty(prev => ({ ...prev, [field]: value }))
-  }
-  function updateHeloc(field, value) {
-    setHeloc(prev => ({ ...prev, [field]: value }))
-  }
-
-  function nextStep() {
+  useEffect(() => {
     saveDraft(draftId, step, applicant.firstName, applicant.lastName)
-    setStep(s => Math.min(s + 1, 2))
-  }
-  function prevStep() {
-    setStep(s => Math.max(s - 1, 0))
-  }
+  }, [step, applicant.firstName, applicant.lastName, draftId])
+
+  const input = 'form-input w-full'
+  const select = 'form-input w-full bg-white'
+
+  function updateApplicant(e) { setApplicant(prev => ({ ...prev, [e.target.name]: e.target.value })) }
+  function updateProperty(e) { setProperty(prev => ({ ...prev, [e.target.name]: e.target.value })) }
+  function updateHeloc(e) { setHeloc(prev => ({ ...prev, [e.target.name]: e.target.value })) }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
-    setSubmitting(true)
+    const validationError = validatePayload(applicant, property, heloc)
+    if (validationError) { setError(validationError); return }
+
+    setLoading(true)
     try {
       const payload = {
+        loanAmount: safeFloat(heloc.requestedCreditLine),
+        propertyAddress: [property.propertyAddress, property.propertyCity, property.propertyState, property.propertyZip].filter(Boolean).join(', '),
         applicant: {
           ...applicant,
-          annualIncome: parseFloat(applicant.annualIncome) || 0,
-          monthlyHousingPayment: parseFloat(applicant.monthlyHousingPayment) || 0,
+          annualIncome: safeFloat(applicant.annualIncome),
+          monthlyHousingPayment: safeFloat(applicant.monthlyHousingPayment)
         },
         propertyInfo: {
           ...property,
-          estimatedPropertyValue: parseFloat(property.estimatedPropertyValue) || 0,
-          currentMortgageBalance: parseFloat(property.currentMortgageBalance) || 0,
-          yearBuilt: parseInt(property.yearBuilt) || 0,
-          squareFootage: parseInt(property.squareFootage) || 0,
-          propertyTaxAnnual: parseFloat(property.propertyTaxAnnual) || 0,
-          homeInsuranceAnnual: parseFloat(property.homeInsuranceAnnual) || 0,
-          hoaMonthly: parseFloat(property.hoaMonthly) || 0,
+          estimatedPropertyValue: safeFloat(property.estimatedPropertyValue),
+          currentMortgageBalance: safeFloat(property.currentMortgageBalance),
+          yearBuilt: safeInt(property.yearBuilt),
+          squareFootage: safeInt(property.squareFootage),
+          propertyTaxAnnual: safeFloat(property.propertyTaxAnnual),
+          homeInsuranceAnnual: safeFloat(property.homeInsuranceAnnual),
+          hoaMonthly: safeFloat(property.hoaMonthly) || 0
         },
-        requestedCreditLine: parseFloat(heloc.requestedCreditLine) || 0,
-        drawPeriodYears: parseInt(heloc.drawPeriodYears),
-        repaymentPeriodYears: parseInt(heloc.repaymentPeriodYears),
+        requestedCreditLine: safeFloat(heloc.requestedCreditLine),
+        drawPeriodYears: safeInt(heloc.drawPeriodYears),
+        repaymentPeriodYears: safeInt(heloc.repaymentPeriodYears),
         intendedUse: heloc.intendedUse,
+        ...(preApproval?.offerCode ? { preApprovalOfferCode: preApproval.offerCode } : {})
       }
-
-      if (preApproval?.offerCode) {
-        payload.preApprovalOfferCode = preApproval.offerCode
-      }
-
       const result = await submitApplication(payload)
       removeDraft(draftId)
+      // Persist the full submitted payload so ApplicationDetailPage can display it
+      try {
+        const store = JSON.parse(localStorage.getItem('pilot_heloc_submissions') || '{}')
+        store[result.id] = payload
+        localStorage.setItem('pilot_heloc_submissions', JSON.stringify(store))
+      } catch { /* best-effort */ }
       navigate(`/applications/${result.id}/confirmation`)
     } catch (err) {
       setError(err.response?.data?.message ?? err.message ?? 'Submission failed.')
-      setSubmitting(false)
+      setLoading(false)
     }
   }
 
   function handleProveVerified(applicantData, propertyData) {
     if (applicantData) setApplicant(prev => ({ ...prev, ...applicantData }))
     if (propertyData) setProperty(prev => ({ ...prev, ...propertyData }))
+    setShowProve(false)
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <p className="section-label mb-1">Citizens HELOC</p>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">New HELOC Application</h1>
-
-      {/* Pre-approval banner */}
-      {preApproval && (
-        <div className="bg-citizens-green-light border border-citizens-green rounded-lg px-4 py-3 mb-6 text-sm">
-          <span className="font-semibold text-citizens-green">Pre-Approved: </span>
-          <span className="text-citizens-navy">
-            Up to ${Number(preApproval.preApprovedAmount).toLocaleString()} at {Number(preApproval.preApprovedApr).toFixed(2)}% APR
-          </span>
-        </div>
-      )}
+    <div className="max-w-3xl mx-auto px-6 py-8">
+      <h1 className="text-2xl font-bold text-citizens-navy mb-1">New HELOC Application</h1>
+      <p className="text-sm text-gray-500 mb-6">Complete all three steps to submit your home equity line of credit application.</p>
 
       {/* Step indicator */}
-      <div className="flex items-center gap-2 mb-8">
-        {STEP_LABELS.map((label, i) => (
-          <div key={label} className="flex items-center gap-2">
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-colors
-              ${i < step ? 'bg-citizens-green text-white'
-                : i === step ? 'bg-citizens-navy text-white'
-                : 'bg-gray-200 text-gray-500'}`}>
-              {i < step ? '\u2713' : i + 1}
+      <div className="flex items-center mb-8">
+        {STEPS.map((s, i) => (
+          <div key={s} className="flex items-center flex-1">
+            <div className="flex flex-col items-center flex-1">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
+                i < step ? 'bg-citizens-green border-citizens-green text-white' :
+                i === step ? 'bg-white border-citizens-green text-citizens-green' :
+                'bg-white border-gray-300 text-gray-400'
+              }`}>
+                {i < step ? '\u2713' : i + 1}
+              </div>
+              <span className={`mt-1 text-xs ${i <= step ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>{s}</span>
             </div>
-            <span className={`text-sm font-medium ${i === step ? 'text-gray-900' : 'text-gray-400'}`}>{label}</span>
-            {i < STEP_LABELS.length - 1 && <div className={`w-12 h-0.5 ${i < step ? 'bg-citizens-green' : 'bg-gray-200'}`} />}
+            {i < STEPS.length - 1 && (
+              <div className={`h-0.5 flex-1 mx-1 ${i < step ? 'bg-citizens-green' : 'bg-gray-200'}`} />
+            )}
           </div>
         ))}
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-3 text-sm mb-4">{error}</div>
+        <div className="mb-4 bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-3 text-sm">{error}</div>
       )}
 
-      <form onSubmit={handleSubmit} className="card p-6">
-        {/* Step 0: Applicant */}
+      {preApproval && (
+        <div className="mb-4 bg-citizens-green-light border border-citizens-green rounded-lg px-4 py-3 text-sm text-citizens-green">
+          Pre-approved for up to <strong>${Number(preApproval.preApprovedAmount).toLocaleString()}</strong> at <strong>{preApproval.preApprovedApr}% APR</strong>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Step 1: Applicant */}
         {step === 0 && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Applicant Information</h2>
-
-            <ProvePanel onVerified={handleProveVerified} />
-
+          <>
+            {showProve && <ProvePanel onVerified={handleProveVerified} onSkip={() => setShowProve(false)} />}
             <div className="grid grid-cols-2 gap-4">
-              <Input label="First Name" value={applicant.firstName} onChange={v => updateApplicant('firstName', v)} required />
-              <Input label="Last Name"  value={applicant.lastName}  onChange={v => updateApplicant('lastName', v)} required />
+              <Field label="First Name"><input name="firstName" value={applicant.firstName} onChange={updateApplicant} required className={input} /></Field>
+              <Field label="Last Name"><input name="lastName" value={applicant.lastName} onChange={updateApplicant} required className={input} /></Field>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Date of Birth" value={applicant.dob} onChange={v => updateApplicant('dob', v)} type="date" required />
-              <Input label="SSN"           value={applicant.ssn} onChange={v => updateApplicant('ssn', v)} placeholder="555-55-5555" required />
+              <Field label="Date of Birth"><input type="date" name="dob" value={applicant.dob} onChange={updateApplicant} required className={input} /></Field>
+              <Field label="SSN"><input name="ssn" value={applicant.ssn} onChange={updateApplicant} required placeholder="XXX-XX-XXXX" className={input} /></Field>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Email" value={applicant.email} onChange={v => updateApplicant('email', v)} type="email" required />
-              <Input label="Phone" value={applicant.phone} onChange={v => updateApplicant('phone', v)} placeholder="(401) 555-1234" required />
+              <Field label="Email"><input type="email" name="email" value={applicant.email} onChange={updateApplicant} required className={input} /></Field>
+              <Field label="Phone"><input type="tel" name="phone" value={applicant.phone} onChange={updateApplicant} required className={input} /></Field>
             </div>
-            <Input label="Address" value={applicant.address} onChange={v => updateApplicant('address', v)} required />
+            <Field label="Address"><input name="address" value={applicant.address} onChange={updateApplicant} required className={input} /></Field>
             <div className="grid grid-cols-2 gap-4">
-              <Select label="Employment Type" value={applicant.employmentType} onChange={v => updateApplicant('employmentType', v)}
-                options={[
-                  { value: 'EMPLOYED', label: 'Employed' },
-                  { value: 'SELF_EMPLOYED', label: 'Self-Employed' },
-                  { value: 'RETIRED', label: 'Retired' },
-                  { value: 'OTHER', label: 'Other' },
-                ]} />
-              <Input label="Employer Name" value={applicant.employerName} onChange={v => updateApplicant('employerName', v)} />
+              <Field label="Employment Type">
+                <select name="employmentType" value={applicant.employmentType} onChange={updateApplicant} className={select}>
+                  <option value="EMPLOYED">Employed</option>
+                  <option value="SELF_EMPLOYED">Self-Employed</option>
+                  <option value="RETIRED">Retired</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </Field>
+              <Field label="Employer Name"><input name="employerName" value={applicant.employerName} onChange={updateApplicant} className={input} /></Field>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Annual Income" value={applicant.annualIncome} onChange={v => updateApplicant('annualIncome', v)} type="number" placeholder="95000" required />
-              <Input label="Monthly Housing Payment" value={applicant.monthlyHousingPayment} onChange={v => updateApplicant('monthlyHousingPayment', v)} type="number" placeholder="2200" required />
+              <Field label="Annual Income ($)"><input type="number" name="annualIncome" value={applicant.annualIncome} onChange={updateApplicant} required min="0" className={input} /></Field>
+              <Field label="Monthly Housing Payment ($)"><input type="number" name="monthlyHousingPayment" value={applicant.monthlyHousingPayment} onChange={updateApplicant} required min="0" className={input} /></Field>
             </div>
-
-            <div className="flex justify-end pt-4">
-              <button type="button" onClick={nextStep} className="btn-primary">Next: Property &rarr;</button>
-            </div>
-          </div>
+          </>
         )}
 
-        {/* Step 1: Property */}
+        {/* Step 2: Property */}
         {step === 1 && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Property Information</h2>
-
-            <Input label="Property Address" value={property.propertyAddress} onChange={v => updateProperty('propertyAddress', v)} placeholder="100 Westminster St" required />
+          <>
+            <Field label="Property Address"><input name="propertyAddress" value={property.propertyAddress} onChange={updateProperty} required className={input} /></Field>
             <div className="grid grid-cols-3 gap-4">
-              <Input label="City"  value={property.propertyCity}  onChange={v => updateProperty('propertyCity', v)} placeholder="Providence" required />
-              <Input label="State" value={property.propertyState} onChange={v => updateProperty('propertyState', v)} placeholder="RI" required />
-              <Input label="ZIP"   value={property.propertyZip}   onChange={v => updateProperty('propertyZip', v)} placeholder="02903" required />
-            </div>
-            <Select label="Property Type" value={property.propertyType} onChange={v => updateProperty('propertyType', v)}
-              options={[
-                { value: 'PRIMARY_RESIDENCE', label: 'Primary Residence' },
-                { value: 'SECOND_HOME', label: 'Second Home' },
-                { value: 'INVESTMENT', label: 'Investment Property' },
-              ]} required />
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Estimated Property Value" value={property.estimatedPropertyValue} onChange={v => updateProperty('estimatedPropertyValue', v)} type="number" placeholder="450000" required />
-              <Input label="Current Mortgage Balance"  value={property.currentMortgageBalance}  onChange={v => updateProperty('currentMortgageBalance', v)} type="number" placeholder="280000" required />
+              <Field label="City"><input name="propertyCity" value={property.propertyCity} onChange={updateProperty} required className={input} /></Field>
+              <Field label="State"><input name="propertyState" value={property.propertyState} onChange={updateProperty} required className={input} /></Field>
+              <Field label="ZIP"><input name="propertyZip" value={property.propertyZip} onChange={updateProperty} required className={input} /></Field>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Year Built"     value={property.yearBuilt}     onChange={v => updateProperty('yearBuilt', v)} type="number" placeholder="1995" />
-              <Input label="Square Footage"  value={property.squareFootage}  onChange={v => updateProperty('squareFootage', v)} type="number" placeholder="2200" />
+              <Field label="Property Type">
+                <select name="propertyType" value={property.propertyType} onChange={updateProperty} className={select}>
+                  <option value="PRIMARY_RESIDENCE">Primary Residence</option>
+                  <option value="SECOND_HOME">Second Home</option>
+                  <option value="INVESTMENT">Investment Property</option>
+                </select>
+              </Field>
+              <Field label="Year Built"><input type="number" name="yearBuilt" value={property.yearBuilt} onChange={updateProperty} required min="1800" className={input} /></Field>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              <Input label="Annual Property Tax"    value={property.propertyTaxAnnual}    onChange={v => updateProperty('propertyTaxAnnual', v)} type="number" placeholder="5400" />
-              <Input label="Annual Home Insurance"  value={property.homeInsuranceAnnual}  onChange={v => updateProperty('homeInsuranceAnnual', v)} type="number" placeholder="1800" />
-              <Input label="Monthly HOA (optional)" value={property.hoaMonthly}           onChange={v => updateProperty('hoaMonthly', v)} type="number" placeholder="0" />
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Estimated Property Value ($)"><input type="number" name="estimatedPropertyValue" value={property.estimatedPropertyValue} onChange={updateProperty} required min="0" className={input} /></Field>
+              <Field label="Current Mortgage Balance ($)"><input type="number" name="currentMortgageBalance" value={property.currentMortgageBalance} onChange={updateProperty} required min="0" className={input} /></Field>
             </div>
-
-            {property.propertyAddress && (
-              <PropertyImage address={`${property.propertyAddress}, ${property.propertyCity}, ${property.propertyState}`} />
-            )}
-
-            <div className="flex justify-between pt-4">
-              <button type="button" onClick={prevStep} className="btn-secondary">&larr; Back</button>
-              <button type="button" onClick={nextStep} className="btn-primary">Next: HELOC Details &rarr;</button>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Square Footage"><input type="number" name="squareFootage" value={property.squareFootage} onChange={updateProperty} required min="0" className={input} /></Field>
+              <Field label="HOA Monthly ($)"><input type="number" name="hoaMonthly" value={property.hoaMonthly} onChange={updateProperty} min="0" className={input} placeholder="0" /></Field>
             </div>
-          </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Annual Property Tax ($)"><input type="number" name="propertyTaxAnnual" value={property.propertyTaxAnnual} onChange={updateProperty} required min="0" className={input} /></Field>
+              <Field label="Annual Home Insurance ($)"><input type="number" name="homeInsuranceAnnual" value={property.homeInsuranceAnnual} onChange={updateProperty} required min="0" className={input} /></Field>
+            </div>
+          </>
         )}
 
-        {/* Step 2: HELOC */}
+        {/* Step 3: HELOC Details */}
         {step === 2 && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-gray-900 mb-2">HELOC Details</h2>
-
-            <Input label="Requested Credit Line" value={heloc.requestedCreditLine} onChange={v => updateHeloc('requestedCreditLine', v)} type="number" placeholder="100000" required />
+          <>
+            <Field label="Requested Credit Line ($)"><input type="number" name="requestedCreditLine" value={heloc.requestedCreditLine} onChange={updateHeloc} required min="5000" className={input} /></Field>
             <div className="grid grid-cols-2 gap-4">
-              <Select label="Draw Period (Years)" value={heloc.drawPeriodYears} onChange={v => updateHeloc('drawPeriodYears', v)}
-                options={[
-                  { value: '5', label: '5 years' },
-                  { value: '7', label: '7 years' },
-                  { value: '10', label: '10 years' },
-                ]} required />
-              <Select label="Repayment Period (Years)" value={heloc.repaymentPeriodYears} onChange={v => updateHeloc('repaymentPeriodYears', v)}
-                options={[
-                  { value: '10', label: '10 years' },
-                  { value: '15', label: '15 years' },
-                  { value: '20', label: '20 years' },
-                ]} required />
+              <Field label="Draw Period">
+                <select name="drawPeriodYears" value={heloc.drawPeriodYears} onChange={updateHeloc} className={select}>
+                  <option value="5">5 years</option>
+                  <option value="7">7 years</option>
+                  <option value="10">10 years</option>
+                </select>
+              </Field>
+              <Field label="Repayment Period">
+                <select name="repaymentPeriodYears" value={heloc.repaymentPeriodYears} onChange={updateHeloc} className={select}>
+                  <option value="10">10 years</option>
+                  <option value="15">15 years</option>
+                  <option value="20">20 years</option>
+                </select>
+              </Field>
             </div>
-            <Select label="Intended Use" value={heloc.intendedUse} onChange={v => updateHeloc('intendedUse', v)}
-              options={[
-                { value: 'HOME_IMPROVEMENT', label: 'Home Improvement' },
-                { value: 'DEBT_CONSOLIDATION', label: 'Debt Consolidation' },
-                { value: 'EDUCATION', label: 'Education' },
-                { value: 'EMERGENCY_FUND', label: 'Emergency Fund' },
-                { value: 'OTHER', label: 'Other' },
-              ]} required />
-
-            <div className="flex justify-between pt-4">
-              <button type="button" onClick={prevStep} className="btn-secondary">&larr; Back</button>
-              <button type="submit" disabled={submitting} className="btn-primary disabled:opacity-50">
-                {submitting ? 'Submitting...' : 'Submit Application'}
-              </button>
-            </div>
-          </div>
+            <Field label="Intended Use">
+              <select name="intendedUse" value={heloc.intendedUse} onChange={updateHeloc} className={select}>
+                <option value="HOME_IMPROVEMENT">Home Improvement</option>
+                <option value="DEBT_CONSOLIDATION">Debt Consolidation</option>
+                <option value="EDUCATION">Education</option>
+                <option value="EMERGENCY_FUND">Emergency Fund</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </Field>
+          </>
         )}
+
+        {/* Navigation */}
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+          {step > 0 ? (
+            <button type="button" onClick={() => setStep(s => s - 1)} className="btn-secondary">&larr; Back</button>
+          ) : <div />}
+          {step < STEPS.length - 1 ? (
+            <button type="button" onClick={() => setStep(s => s + 1)} className="btn-primary">Next &rarr;</button>
+          ) : (
+            <button type="submit" disabled={loading} className="btn-primary disabled:opacity-50">
+              {loading ? 'Submitting\u2026' : 'Submit Application'}
+            </button>
+          )}
+        </div>
       </form>
     </div>
   )

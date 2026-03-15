@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: 'http://localhost:9090',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, '/heloc-application-service/1.0')
+          rewrite: (path) => path.replace(/^\/api/, '/heloc-application-service/0.0')
         },
         '/appraisal-api': {
           target: 'http://localhost:9095',

@@ -50,11 +50,21 @@ const preapprovalApi = attachInterceptor(
 const STATUS_MAP = {
   STARTED: 'SUBMITTED',
   PROFILE_COMPLETE: 'CREDIT_REVIEW',
-  CREDIT_PULLED: 'PROPERTY_APPRAISED',
-  PRICED: 'UNDERWRITING',
-  DOCUMENTS_UPLOADED: 'UNDERWRITING',
-  DECISIONED: 'BOOKED',
+  CREDIT_PULLED: 'CREDIT_REVIEW',
+  PRICED: 'PROPERTY_APPRAISED',
+  DOCUMENTS_UPLOADED: 'MANUAL_REVIEW',
+  DECISIONED: 'DENIED',
   FUNDED: 'BOOKED',
+}
+
+function deriveStatus(raw) {
+  // Use underwritingStatus for terminal states when available
+  const uw = raw.underwritingStatus
+  if (uw === 'APPROVED') return 'BOOKED'
+  if (uw === 'DENIED') return 'DENIED'
+  if (uw === 'MANUAL_REVIEW') return 'MANUAL_REVIEW'
+  // Fall back to STATUS_MAP for in-progress states
+  return STATUS_MAP[raw.applicationStatus] ?? raw.applicationStatus ?? raw.status ?? 'SUBMITTED'
 }
 
 function getSubmissionData(id) {
@@ -66,7 +76,7 @@ function getSubmissionData(id) {
 
 function normalizeApplication(raw) {
   if (!raw) return raw
-  const status = STATUS_MAP[raw.applicationStatus] ?? raw.applicationStatus ?? raw.status ?? 'SUBMITTED'
+  const status = deriveStatus(raw)
   const parts = (raw.propertyAddress || '').split(',').map(s => s.trim())
 
   // Merge locally-stored submission data (applicant, propertyInfo, HELOC details)
@@ -87,6 +97,37 @@ function normalizeApplication(raw) {
       propertyState: (parts[2] || '').split(' ')[0] || '',
       propertyZip: (parts[2] || '').split(' ')[1] || '',
     } : null),
+
+    // ── Pipeline result fields from backend ──────────────────────────────
+    creditScore: raw.creditScore ?? null,
+    creditDecisionType: raw.creditDecision ?? null,
+    creditDecisionReasons: raw.creditDecisionReasons ?? null,
+    dti: raw.dti ?? null,
+    ltv: raw.cltv ?? null,
+    interestRate: raw.interestRate ?? null,
+
+    // Open Banking (Argyle)
+    bankName: raw.bankName ?? null,
+    maskedAccountNumber: raw.maskedAccountNumber ?? null,
+    monthlyIncome: raw.monthlyIncome ?? null,
+    monthlyExpenses: raw.monthlyExpenses ?? null,
+    cashflowScore: raw.cashflowScore ?? null,
+    autopayEnrolled: raw.autopayEnrolled ?? null,
+
+    // AVM Property Appraisal
+    appraisedValue: raw.appraisedValue ?? null,
+    avmConfidence: raw.avmConfidence ?? null,
+    appraisalDate: raw.appraisalDate ?? null,
+
+    // Underwriting
+    underwritingRecommendation: raw.underwritingStatus ?? null,
+    underwritingNotes: raw.underwritingNotes ?? null,
+    approvedCreditLine: raw.approvedCreditLine ?? null,
+    monthlyPayment: raw.monthlyPayment ?? null,
+
+    // Derived flags
+    banked: !!(raw.bankName),
+    appraised: !!(raw.appraisedValue),
   }
 }
 

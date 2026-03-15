@@ -152,8 +152,8 @@ function UnderwriterSummary({ app }) {
             <DecisionChip label="Booking" value="BOOKED" />
           </>}
           <span className="flex-1" />
-          {app.decisionReason && (
-            <p className="text-xs text-gray-500 italic max-w-xs text-right">{app.decisionReason}</p>
+          {app.creditDecisionReasons && (
+            <p className="text-xs text-gray-500 italic max-w-xs text-right">{app.creditDecisionReasons}</p>
           )}
         </div>
       </div>
@@ -337,7 +337,7 @@ function OutcomeBanner({ app }) {
       <div>
         <p className="text-red-800 font-bold text-base">HELOC Application Declined</p>
         <p className="text-red-700 text-sm mt-0.5">
-          {app.decisionReason ?? 'This application did not meet our HELOC lending criteria.'}
+          {app.underwritingNotes ?? app.creditDecisionReasons ?? 'This application did not meet our HELOC lending criteria.'}
         </p>
       </div>
     </div>
@@ -448,8 +448,8 @@ export default function ApplicationDetailPage() {
                 <span className="text-sm text-gray-500">Decision:</span>
                 <StatusBadge status={app.creditDecisionType} />
               </div>
-              {app.decisionReason && (
-                <p className="mt-2 text-xs text-gray-500 italic">{app.decisionReason}</p>
+              {app.creditDecisionReasons && (
+                <p className="mt-2 text-xs text-gray-500 italic">{app.creditDecisionReasons}</p>
               )}
             </>
           ) : (
@@ -463,7 +463,9 @@ export default function ApplicationDetailPage() {
               <Row label="Bank" value={app.bankName} />
               <Row label="Account" value={app.maskedAccountNumber} />
               <Row label="Autopay" value={app.autopayEnrolled ? 'Enrolled' : 'Not Enrolled'} highlight={app.autopayEnrolled} />
-              {app.accountVerifiedAt && <Row label="Verified" value={fmtDate(app.accountVerifiedAt)} />}
+              {app.monthlyIncome != null && <Row label="Monthly Income" value={fmt(app.monthlyIncome)} />}
+              {app.monthlyExpenses != null && <Row label="Monthly Expenses" value={fmt(app.monthlyExpenses)} />}
+              {app.cashflowScore != null && <Row label="Cashflow Score" value={app.cashflowScore} />}
             </>
           ) : (
             <p className="text-sm text-gray-400 italic">Bank account not yet linked. This step occurs after credit review in the pipeline.</p>
@@ -478,7 +480,8 @@ export default function ApplicationDetailPage() {
             <>
               <Row label="Cashflow Score" value={app.cashflowScore} />
               <Row label="Recommendation" value={app.underwritingRecommendation} />
-              {app.ofacStatus && <Row label="OFAC Screening" value={app.ofacStatus} />}
+              {app.approvedCreditLine != null && <Row label="Approved Credit Line" value={fmt(app.approvedCreditLine)} />}
+              {app.underwritingNotes && <p className="mt-2 text-xs text-gray-500 italic">{app.underwritingNotes}</p>}
             </>
           ) : (
             <p className="text-sm text-gray-400 italic">Awaiting underwriting review. This step occurs after open banking verification.</p>
@@ -496,10 +499,10 @@ export default function ApplicationDetailPage() {
           <Card title="Property Appraisal">
             {hasAppraisalData ? (
               <>
-                <Row label="Appraised Value" value={fmt(app.appraisedValue)} />
-                <Row label="Appraisal Date" value={fmtDate(app.appraisalDate)} />
-                <Row label="CLTV Ratio" value={app.cltv != null ? fmtPct(app.cltv) : '\u2014'} />
-                <Row label="Flood Zone" value={app.floodZoneStatus ?? 'N/A'} />
+                  <Row label="Appraised Value" value={fmt(app.appraisedValue)} />
+                  <Row label="Appraisal Date" value={fmtDate(app.appraisalDate)} />
+                  <Row label="AVM Confidence" value={app.avmConfidence != null ? `${(app.avmConfidence * 100).toFixed(0)}%` : '\u2014'} />
+                  <Row label="CLTV Ratio" value={app.cltv != null ? fmtPct(app.cltv) : '\u2014'} />
               </>
             ) : (
               <p className="text-sm text-gray-400 italic">Property appraisal not yet completed. An appraisal will be ordered during underwriting.</p>
@@ -556,7 +559,7 @@ export default function ApplicationDetailPage() {
       <div className="bg-citizens-green-light border border-citizens-green rounded-xl px-5 py-4 flex flex-wrap gap-8 mb-6">
         <div>
           <p className="text-xs text-citizens-green font-medium uppercase tracking-wide">Credit Line</p>
-          <p className="text-xl font-bold text-citizens-navy">{fmt(app.requestedCreditLine)}</p>
+          <p className="text-xl font-bold text-citizens-navy">{fmt(app.approvedCreditLine ?? app.requestedCreditLine)}</p>
         </div>
         <div>
           <p className="text-xs text-citizens-green font-medium uppercase tracking-wide">Draw Period</p>
@@ -632,7 +635,7 @@ export default function ApplicationDetailPage() {
             <div className="flex items-center gap-3">
               <span className="w-2 h-2 rounded-full bg-red-500" />
               <span className="text-gray-600">Application declined</span>
-              <span className="text-gray-400 ml-auto">{app.decisionReason ?? ''}</span>
+              <span className="text-gray-400 ml-auto">{app.creditDecisionReasons ?? ''}</span>
             </div>
           )}
           {app.status === 'MANUAL_REVIEW' && (

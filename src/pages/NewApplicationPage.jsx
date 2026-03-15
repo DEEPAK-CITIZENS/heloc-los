@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { submitApplication, redeemPreApprovalOffer } from '../api/helocApi'
+import { submitApplication } from '../api/helocApi'
 import ProvePanel from '../components/ProvePanel'
 
 const STEPS = ['Applicant', 'Property', 'HELOC']
@@ -112,8 +112,9 @@ export default function NewApplicationPage() {
 
   useEffect(() => {
     if (preApproval) {
-      if (preApproval.applicant) setApplicant(prev => ({ ...prev, ...preApproval.applicant }))
-      if (preApproval.property) setProperty(prev => ({ ...prev, ...preApproval.property }))
+      if (preApproval.firstName || preApproval.lastName) {
+        setApplicant(prev => ({ ...prev, firstName: preApproval.firstName ?? '', lastName: preApproval.lastName ?? '' }))
+      }
       if (preApproval.preApprovedAmount) setHeloc(prev => ({ ...prev, requestedCreditLine: String(preApproval.preApprovedAmount) }))
     }
   }, [preApproval])
@@ -156,13 +157,11 @@ export default function NewApplicationPage() {
         requestedCreditLine: safeFloat(heloc.requestedCreditLine),
         drawPeriodYears: safeInt(heloc.drawPeriodYears),
         repaymentPeriodYears: safeInt(heloc.repaymentPeriodYears),
-        intendedUse: heloc.intendedUse
+        intendedUse: heloc.intendedUse,
+        ...(preApproval?.offerCode ? { preApprovalOfferCode: preApproval.offerCode } : {})
       }
       const result = await submitApplication(payload)
       removeDraft(draftId)
-      if (preApproval?.offerCode) {
-        try { await redeemPreApprovalOffer(preApproval.offerCode) } catch { /* ignore */ }
-      }
       navigate(`/applications/${result.id}/confirmation`)
     } catch (err) {
       setError(err.response?.data?.message ?? err.message ?? 'Submission failed.')

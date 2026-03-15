@@ -340,7 +340,7 @@ export default function ApplicationDetailPage() {
       {app.status === 'BOOKED' && <ESignPanel appId={app.id} />}
       {app.status === 'BOOKED' && <LienRecordingPanel app={app} />}
 
-      <PipelineTracker status={app.status} banked={hasAppraisalData} />
+      <PipelineTracker status={app.status} appraised={hasAppraisalData} />
 
       {hasCreditData && <UnderwriterSummary app={app} />}
 

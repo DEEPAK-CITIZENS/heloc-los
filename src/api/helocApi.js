@@ -45,18 +45,50 @@ const preapprovalApi = attachInterceptor(
   'PREAPPROVAL-API'
 )
 
+// ── Response normalization ───────────────────────────────────────────────────
+// Maps backend LoanApplication entity fields to the shape the frontend expects.
+const STATUS_MAP = {
+  STARTED: 'SUBMITTED',
+  PROFILE_COMPLETE: 'CREDIT_REVIEW',
+  CREDIT_PULLED: 'PROPERTY_APPRAISED',
+  PRICED: 'UNDERWRITING',
+  DOCUMENTS_UPLOADED: 'UNDERWRITING',
+  DECISIONED: 'BOOKED',
+  FUNDED: 'BOOKED',
+}
+
+function normalizeApplication(raw) {
+  if (!raw) return raw
+  const status = STATUS_MAP[raw.applicationStatus] ?? raw.applicationStatus ?? raw.status ?? 'SUBMITTED'
+  const parts = (raw.propertyAddress || '').split(',').map(s => s.trim())
+  return {
+    ...raw,
+    status,
+    submittedAt: raw.createdDate ?? raw.submittedAt,
+    requestedCreditLine: raw.requestedCreditLine ?? raw.loanAmount,
+    propertyInfo: raw.propertyInfo ?? (raw.propertyAddress ? {
+      propertyAddress: parts[0] || '',
+      propertyCity: parts[1] || '',
+      propertyState: (parts[2] || '').split(' ')[0] || '',
+      propertyZip: (parts[2] || '').split(' ')[1] || '',
+    } : null),
+  }
+}
+
 // ── HELOC Application CRUD ──────────────────────────────────────────────────
 export function submitApplication(payload) {
-  return api.post('/application', payload).then(r => r.data)
+  return api.post('/application', payload).then(r => normalizeApplication(r.data))
 }
 export function getApplications() {
-  return api.get('/application').then(r => r.data)
+  return api.get('/application')
+    .then(r => (Array.isArray(r.data) ? r.data : []).map(normalizeApplication))
+    .catch(() => [])
 }
 export function getApplication(id) {
-  return api.get(`/application/${id}`).then(r => r.data)
+  return api.get(`/application/${id}`).then(r => normalizeApplication(r.data))
 }
 export function reprocessApplication(id, ssn) {
-  return api.post(`/application/${id}/reprocess`, { ssn }).then(r => r.data)
+  return api.post(`/application/${id}/reprocess`, { ssn }).then(r => normalizeApplication(r.data))
 }
 
 // ── Documents ───────────────────────────────────────────────────────────────
@@ -82,7 +114,9 @@ export function dealStructure(payload) {
   return api.post('/heloc-deal-structure', payload).then(r => r.data)
 }
 export function getAllApplications() {
-  return api.get('/application?all=true').then(r => r.data)
+  return api.get('/application')
+    .then(r => (Array.isArray(r.data) ? r.data : []).map(normalizeApplication))
+    .catch(() => [])
 }
 
 // ── Counter-Offer & Adverse Action ──────────────────────────────────────────

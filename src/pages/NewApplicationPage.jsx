@@ -139,6 +139,8 @@ export default function NewApplicationPage() {
     setLoading(true)
     try {
       const payload = {
+        loanAmount: safeFloat(heloc.requestedCreditLine),
+        propertyAddress: [property.propertyAddress, property.propertyCity, property.propertyState, property.propertyZip].filter(Boolean).join(', '),
         applicant: {
           ...applicant,
           annualIncome: safeFloat(applicant.annualIncome),

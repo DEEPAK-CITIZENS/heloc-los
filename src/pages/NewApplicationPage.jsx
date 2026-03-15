@@ -164,6 +164,12 @@ export default function NewApplicationPage() {
       }
       const result = await submitApplication(payload)
       removeDraft(draftId)
+      // Persist the full submitted payload so ApplicationDetailPage can display it
+      try {
+        const store = JSON.parse(localStorage.getItem('pilot_heloc_submissions') || '{}')
+        store[result.id] = payload
+        localStorage.setItem('pilot_heloc_submissions', JSON.stringify(store))
+      } catch { /* best-effort */ }
       navigate(`/applications/${result.id}/confirmation`)
     } catch (err) {
       setError(err.response?.data?.message ?? err.message ?? 'Submission failed.')

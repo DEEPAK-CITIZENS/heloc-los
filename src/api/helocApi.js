@@ -57,16 +57,31 @@ const STATUS_MAP = {
   FUNDED: 'BOOKED',
 }
 
+function getSubmissionData(id) {
+  try {
+    const store = JSON.parse(localStorage.getItem('pilot_heloc_submissions') || '{}')
+    return store[id] ?? null
+  } catch { return null }
+}
+
 function normalizeApplication(raw) {
   if (!raw) return raw
   const status = STATUS_MAP[raw.applicationStatus] ?? raw.applicationStatus ?? raw.status ?? 'SUBMITTED'
   const parts = (raw.propertyAddress || '').split(',').map(s => s.trim())
+
+  // Merge locally-stored submission data (applicant, propertyInfo, HELOC details)
+  const local = getSubmissionData(raw.id)
+
   return {
     ...raw,
     status,
     submittedAt: raw.createdDate ?? raw.submittedAt,
     requestedCreditLine: raw.requestedCreditLine ?? raw.loanAmount,
-    propertyInfo: raw.propertyInfo ?? (raw.propertyAddress ? {
+    drawPeriodYears: raw.drawPeriodYears ?? local?.drawPeriodYears,
+    repaymentPeriodYears: raw.repaymentPeriodYears ?? local?.repaymentPeriodYears,
+    intendedUse: raw.intendedUse ?? local?.intendedUse,
+    applicant: raw.applicant ?? local?.applicant ?? null,
+    propertyInfo: raw.propertyInfo ?? local?.propertyInfo ?? (raw.propertyAddress ? {
       propertyAddress: parts[0] || '',
       propertyCity: parts[1] || '',
       propertyState: (parts[2] || '').split(' ')[0] || '',
@@ -89,6 +104,9 @@ export function getApplication(id) {
 }
 export function reprocessApplication(id, ssn) {
   return api.post(`/application/${id}/reprocess`, { ssn }).then(r => normalizeApplication(r.data))
+}
+export function decisionApplication(id, decision, reason) {
+  return api.post(`/application/${id}/decision`, { decision, reason }).then(r => normalizeApplication(r.data))
 }
 
 // ── Documents ───────────────────────────────────────────────────────────────

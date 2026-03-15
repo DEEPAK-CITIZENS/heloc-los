@@ -186,24 +186,101 @@ export function getAdverseActionNoticeUrl(id) {
   return `/api/application/${id}/adverse-action-notice`
 }
 
-// ── Lien Recording (replaces Title Transfer from auto-loan) ─────────────────
-export async function initiateLienRecording(payload) {
-  const { data } = await lienApi.post('/lien-recording', payload)
-  return data
+// ── Lien Recording (client-side mock — no backend service on port 9094) ──────
+const LIEN_STORAGE_KEY = 'pilot_heloc_lien_recordings'
+const LIEN_STEPS = ['PENDING', 'TITLE_SEARCH', 'LIEN_FILED', 'CLOSING_DISCLOSURE', 'COMPLETED']
+
+function loadLienStore() {
+  try { return JSON.parse(localStorage.getItem(LIEN_STORAGE_KEY) || '{}') } catch { return {} }
 }
-export async function getLienRecording(applicationId) {
-  const { data } = await lienApi.get(`/lien-recording/application/${applicationId}`)
-  return data
+function saveLienStore(store) {
+  try { localStorage.setItem(LIEN_STORAGE_KEY, JSON.stringify(store)) } catch { /* ignore */ }
 }
 
-// ── E-Sign ──────────────────────────────────────────────────────────────────
-export async function sendForSigning(applicationId) {
-  const { data } = await esignApi.post('/esign/send', { applicationId })
-  return data
+function advanceLienStatus(recording) {
+  const elapsed = Date.now() - new Date(recording.initiatedAt).getTime()
+  const stepMs = 8000 // advance every 8 seconds
+  const idx = Math.min(Math.floor(elapsed / stepMs), LIEN_STEPS.length - 1)
+  return { ...recording, status: LIEN_STEPS[idx] }
 }
+
+export async function initiateLienRecording(payload) {
+  const store = loadLienStore()
+  if (store[payload.applicationId]) return advanceLienStatus(store[payload.applicationId])
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let num = 'LR-'
+  for (let i = 0; i < 8; i++) num += chars[Math.floor(Math.random() * chars.length)]
+  const recording = {
+    id: crypto.randomUUID?.() || Math.random().toString(36).slice(2),
+    applicationId: payload.applicationId,
+    recordingNumber: num,
+    trackingNumber: num,
+    status: 'PENDING',
+    propertyAddress: payload.propertyAddress,
+    creditLineAmount: payload.creditLineAmount,
+    helocAccountNumber: payload.helocAccountNumber,
+    borrowerName: payload.borrowerName,
+    initiatedAt: new Date().toISOString(),
+  }
+  store[payload.applicationId] = recording
+  saveLienStore(store)
+  return recording
+}
+
+export async function getLienRecording(applicationId) {
+  const store = loadLienStore()
+  const recording = store[applicationId]
+  if (!recording) throw new Error('Not found')
+  const updated = advanceLienStatus(recording)
+  store[applicationId] = updated
+  saveLienStore(store)
+  return updated
+}
+
+// ── E-Sign (client-side mock — no backend service on port 9098) ─────────────
+const ESIGN_STORAGE_KEY = 'pilot_heloc_esign'
+
+function loadEsignStore() {
+  try { return JSON.parse(localStorage.getItem(ESIGN_STORAGE_KEY) || '{}') } catch { return {} }
+}
+function saveEsignStore(store) {
+  try { localStorage.setItem(ESIGN_STORAGE_KEY, JSON.stringify(store)) } catch { /* ignore */ }
+}
+
+function advanceEsignStatus(esign) {
+  const elapsed = Date.now() - new Date(esign.sentAt).getTime()
+  if (elapsed > 12000) return { ...esign, status: 'COMPLETED', completedAt: new Date(new Date(esign.sentAt).getTime() + 12000).toISOString() }
+  if (elapsed > 4000) return { ...esign, status: 'SENT' }
+  return { ...esign, status: 'PENDING' }
+}
+
+export async function sendForSigning(applicationId) {
+  const store = loadEsignStore()
+  if (store[applicationId]) return advanceEsignStatus(store[applicationId])
+  const chars = 'abcdef0123456789'
+  let token = ''
+  for (let i = 0; i < 32; i++) token += chars[Math.floor(Math.random() * chars.length)]
+  const esign = {
+    id: crypto.randomUUID?.() || Math.random().toString(36).slice(2),
+    applicationId,
+    status: 'PENDING',
+    signingToken: token,
+    sentAt: new Date().toISOString(),
+    completedAt: null,
+  }
+  store[applicationId] = esign
+  saveEsignStore(store)
+  return esign
+}
+
 export async function getEsignStatus(applicationId) {
-  const { data } = await esignApi.get(`/esign/status/${applicationId}`)
-  return data
+  const store = loadEsignStore()
+  const esign = store[applicationId]
+  if (!esign) return null
+  const updated = advanceEsignStatus(esign)
+  store[applicationId] = updated
+  saveEsignStore(store)
+  return updated
 }
 
 // ── Portfolio Analytics ─────────────────────────────────────────────────────

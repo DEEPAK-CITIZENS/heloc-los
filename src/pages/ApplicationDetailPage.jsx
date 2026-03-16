@@ -25,7 +25,7 @@ function scoreColor(val, thresholds) {
   if (val >= thresholds[1]) return 'text-yellow-600'
   return 'text-red-600'
 }
-function dtiColor(val)  { if (val == null) return 'text-gray-400'; return val < 30 ? 'text-green-600' : val < 43 ? 'text-yellow-600' : 'text-red-600' }
+function dtiColor(val) { if (val == null) return 'text-gray-400'; return val < 30 ? 'text-green-600' : val < 43 ? 'text-yellow-600' : 'text-red-600' }
 function cltvColor(val) { if (val == null) return 'text-gray-400'; return val < 80 ? 'text-green-600' : val < 90 ? 'text-yellow-600' : 'text-red-600' }
 
 function MetricTile({ label, value, color, sub }) {
@@ -45,6 +45,7 @@ function DecisionChip({ label, value }) {
     MANUAL_REVIEW: 'bg-yellow-100 text-yellow-700',
     BOOKED: 'bg-green-100 text-green-700',
     APPRAISED: 'bg-indigo-100 text-indigo-700',
+    CONNECTED: 'bg-blue-100 text-blue-700',
   }
   return (
     <div className="flex flex-col items-center gap-1">
@@ -56,113 +57,29 @@ function DecisionChip({ label, value }) {
   )
 }
 
-function UnderwriterSummary({ app }) {
-  const ap   = app.applicant
-  const prop = app.propertyInfo
-
+/* --- Collapsible Section --- */
+function Section({ title, icon, children, badge, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="bg-citizens-navy-light border border-citizens-navy rounded-xl p-5 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-black uppercase tracking-widest text-citizens-navy">Underwriter Summary</span>
-          <span className="text-xs text-gray-400">&middot; {fmtDate(app.submittedAt)}</span>
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-4">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          {icon && <span className="text-lg">{icon}</span>}
+          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">{title}</h3>
+          {badge}
         </div>
-        <StatusBadge status={app.status} />
-      </div>
-
-      <div className="grid grid-cols-4 gap-3 mb-4">
-        <MetricTile
-          label="Credit Score"
-          value={app.creditScore}
-          color={scoreColor(app.creditScore, [740, 620])}
-          sub={app.creditScore >= 740 ? 'Good\u2013Excellent' : app.creditScore >= 620 ? 'Fair' : 'Below Threshold'}
-        />
-        <MetricTile
-          label="DTI Ratio"
-          value={app.dti != null ? `${Number(app.dti).toFixed(1)}%` : null}
-          color={dtiColor(app.dti)}
-          sub={app.dti != null ? (app.dti < 30 ? 'Low risk' : app.dti < 43 ? 'Moderate' : 'High risk') : null}
-        />
-        <MetricTile
-          label="CLTV Ratio"
-          value={app.cltv != null ? `${Number(app.cltv).toFixed(1)}%` : null}
-          color={cltvColor(app.cltv)}
-          sub={app.cltv != null ? (app.cltv < 80 ? 'Low risk' : app.cltv < 90 ? 'Moderate' : 'High risk') : null}
-        />
-        <MetricTile
-          label="Cashflow Score"
-          value={app.cashflowScore}
-          color={scoreColor(app.cashflowScore, [750, 650])}
-          sub={app.cashflowScore != null ? (app.cashflowScore >= 750 ? 'Strong' : app.cashflowScore >= 650 ? 'Adequate' : 'Weak') : null}
-        />
-      </div>
-
-      <div className="grid grid-cols-3 gap-4 mb-4 text-sm">
-        <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 space-y-1">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Applicant</p>
-          <p className="font-semibold text-gray-800">{ap ? `${ap.firstName} ${ap.lastName}` : '\u2014'}</p>
-          <p className="text-gray-500">{ap?.employmentType?.replace(/_/g, ' ')} {ap?.employerName ? `\u00b7 ${ap.employerName}` : ''}</p>
-          <p className="text-gray-600">Income: <span className="font-medium text-gray-800">{fmt(ap?.annualIncome)}/yr</span></p>
-          <p className="text-gray-600">Housing: <span className="font-medium text-gray-800">{fmt(ap?.monthlyHousingPayment)}/mo</span></p>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 space-y-1">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">HELOC Request</p>
-          <p className="font-semibold text-gray-800">{fmt(app.requestedCreditLine)} <span className="font-normal text-gray-500">credit line</span></p>
-          <p className="text-gray-600">Draw: <span className="font-medium text-gray-800">{app.drawPeriodYears} years</span></p>
-          <p className="text-gray-600">Repayment: <span className="font-medium text-gray-800">{app.repaymentPeriodYears} years</span></p>
-          {app.interestRate != null && <p className="text-gray-600">Rate: <span className="font-medium text-gray-800">{Number(app.interestRate).toFixed(2)}%</span></p>}
-          {app.monthlyPayment != null && <p className="text-gray-600">Payment: <span className="font-medium text-gray-800">{fmt(app.monthlyPayment)}/mo</span></p>}
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 space-y-1">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Property</p>
-          {prop ? (
-            <>
-              <p className="font-semibold text-gray-800">{prop.propertyAddress}</p>
-              <p className="text-gray-500">{prop.propertyCity}, {prop.propertyState} {prop.propertyZip}</p>
-              <p className="text-gray-600">Type: <span className="font-medium text-gray-800">{prop.propertyType?.replace(/_/g, ' ')}</span></p>
-              <p className="text-gray-600">Value: <span className="font-medium text-gray-800">{fmt(prop.estimatedPropertyValue)}</span></p>
-              <p className="text-gray-600">Mortgage: <span className="font-medium text-gray-800">{fmt(prop.currentMortgageBalance)}</span></p>
-            </>
-          ) : <p className="text-gray-400">No property data</p>}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg border border-gray-200 px-4 py-3">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Decision Trail</p>
-        <div className="flex items-center gap-2">
-          <DecisionChip label="Credit" value={app.creditDecisionType} />
-          {app.appraisedValue != null && <>
-            <span className="text-gray-300 text-lg">&rarr;</span>
-            <DecisionChip label="Appraisal" value="APPRAISED" />
-          </>}
-          {app.underwritingRecommendation && <>
-            <span className="text-gray-300 text-lg">&rarr;</span>
-            <DecisionChip label="Underwriting" value={app.underwritingRecommendation} />
-          </>}
-          {app.helocAccountNumber && <>
-            <span className="text-gray-300 text-lg">&rarr;</span>
-            <DecisionChip label="Booking" value="BOOKED" />
-          </>}
-          <span className="flex-1" />
-          {app.decisionReason && (
-            <p className="text-xs text-gray-500 italic max-w-xs text-right">{app.decisionReason}</p>
-          )}
-        </div>
-      </div>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && <div className="px-5 pb-5 border-t border-gray-100">{children}</div>}
     </div>
   )
 }
 
-function Card({ title, children }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">{title}</h3>
-      {children}
-    </div>
-  )
-}
 function Row({ label, value }) {
   return (
     <div className="flex justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm">
@@ -172,6 +89,311 @@ function Row({ label, value }) {
   )
 }
 
+/* --- 1. Customer Demographics --- */
+function CustomerDemographicsSection({ applicant }) {
+  if (!applicant) return null
+  const ap = applicant
+  return (
+    <Section title="Customer Demographics" icon={'\ud83d\udc64'}>
+      <div className="grid grid-cols-3 gap-6 pt-3">
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Personal Information</p>
+          <Row label="Full Name" value={`${ap.firstName} ${ap.lastName}`} />
+          <Row label="Date of Birth" value={fmtDate(ap.dob)} />
+          <Row label="SSN" value={ap.ssn ? `***-**-${ap.ssn.slice(-4)}` : '\u2014'} />
+          <Row label="Email" value={ap.email} />
+          <Row label="Phone" value={ap.phone} />
+          <Row label="Address" value={ap.address} />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Employment</p>
+          <Row label="Employment Type" value={ap.employmentType?.replace(/_/g, ' ')} />
+          <Row label="Employer" value={ap.employerName} />
+          <Row label="Annual Income" value={fmt(ap.annualIncome)} />
+          <Row label="Monthly Housing" value={fmt(ap.monthlyHousingPayment)} />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Financial Summary</p>
+          <Row label="Gross Monthly Income" value={ap.annualIncome ? fmt(ap.annualIncome / 12) : '\u2014'} />
+          <Row label="Housing-to-Income" value={ap.annualIncome && ap.monthlyHousingPayment ? `${((ap.monthlyHousingPayment / (ap.annualIncome / 12)) * 100).toFixed(1)}%` : '\u2014'} />
+          <Row label="Disposable (est.)" value={ap.annualIncome && ap.monthlyHousingPayment ? fmt((ap.annualIncome / 12) - ap.monthlyHousingPayment) : '\u2014'} />
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+/* --- 2. Property Information --- */
+function PropertyInfoSection({ propertyInfo, app }) {
+  if (!propertyInfo) return null
+  const prop = propertyInfo
+  const equity = prop.estimatedPropertyValue && prop.currentMortgageBalance
+    ? prop.estimatedPropertyValue - prop.currentMortgageBalance : null
+  const ltv = prop.estimatedPropertyValue && prop.currentMortgageBalance
+    ? ((prop.currentMortgageBalance / prop.estimatedPropertyValue) * 100) : null
+
+  return (
+    <Section title="Property Information" icon={'\ud83c\udfe0'}>
+      <div className="pt-3">
+        <div className="mb-4">
+          <PropertyImage address={`${prop.propertyAddress}, ${prop.propertyCity}, ${prop.propertyState}`} />
+        </div>
+        <div className="grid grid-cols-3 gap-6">
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Location</p>
+            <Row label="Street" value={prop.propertyAddress} />
+            <Row label="City" value={prop.propertyCity} />
+            <Row label="State" value={prop.propertyState} />
+            <Row label="ZIP" value={prop.propertyZip} />
+            <Row label="Property Type" value={prop.propertyType?.replace(/_/g, ' ')} />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Property Details</p>
+            <Row label="Year Built" value={prop.yearBuilt} />
+            <Row label="Square Footage" value={prop.squareFootage?.toLocaleString()} />
+            <Row label="Annual Property Tax" value={fmt(prop.propertyTaxAnnual)} />
+            <Row label="Annual Insurance" value={fmt(prop.homeInsuranceAnnual)} />
+            <Row label="Monthly HOA" value={prop.hoaMonthly ? fmt(prop.hoaMonthly) : 'None'} />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Valuation</p>
+            <Row label="Estimated Value" value={fmt(prop.estimatedPropertyValue)} />
+            <Row label="Current Mortgage" value={fmt(prop.currentMortgageBalance)} />
+            <Row label="Available Equity" value={equity != null ? fmt(equity) : '\u2014'} />
+            <Row label="Current LTV" value={ltv != null ? `${ltv.toFixed(1)}%` : '\u2014'} />
+            {app.appraisedValue != null && <Row label="Appraised Value" value={fmt(app.appraisedValue)} />}
+            {app.appraisalDate && <Row label="Appraisal Date" value={fmtDate(app.appraisalDate)} />}
+          </div>
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+/* --- 3. Loan (HELOC) Information --- */
+function LoanInfoSection({ app }) {
+  const interestOnlyPayment = app.requestedCreditLine && app.interestRate
+    ? (app.requestedCreditLine * (app.interestRate / 100 / 12)) : null
+
+  return (
+    <Section title="HELOC Loan Information" icon={'\ud83d\udcb0'}>
+      <div className="grid grid-cols-3 gap-6 pt-3">
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Credit Line Details</p>
+          <Row label="Requested Credit Line" value={fmt(app.requestedCreditLine ?? app.loanAmount)} />
+          <Row label="Draw Period" value={app.drawPeriodYears ? `${app.drawPeriodYears} years` : '\u2014'} />
+          <Row label="Repayment Period" value={app.repaymentPeriodYears ? `${app.repaymentPeriodYears} years` : '\u2014'} />
+          <Row label="Intended Use" value={app.intendedUse?.replace(/_/g, ' ')} />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pricing</p>
+          <Row label="Interest Rate" value={app.interestRate != null ? `${Number(app.interestRate).toFixed(2)}%` : '\u2014'} />
+          <Row label="Interest-Only Payment" value={interestOnlyPayment != null ? fmt(interestOnlyPayment) : '\u2014'} />
+          <Row label="P+I Monthly Payment" value={app.monthlyPayment != null ? fmt(app.monthlyPayment) : '\u2014'} />
+          <Row label="APR" value={app.apr != null ? `${Number(app.apr).toFixed(2)}%` : '\u2014'} />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Account</p>
+          <Row label="HELOC Account #" value={app.helocAccountNumber} />
+          <Row label="Account Status" value={app.loanStatus ?? app.helocStatus} />
+          <Row label="Booking Date" value={fmtDate(app.bookedAt)} />
+          <Row label="First Draw Available" value={app.helocAccountNumber ? 'Yes' : 'Pending'} />
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+/* --- 4. Open Banking --- */
+function OpenBankingSection({ app }) {
+  const hasBankData = app.bankName != null || app.cashflowScore != null || app.bankAccountVerified != null
+  return (
+    <Section
+      title="Open Banking"
+      icon={'\ud83c\udfe6'}
+      badge={hasBankData
+        ? <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">Connected</span>
+        : <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-500">Pending</span>}
+    >
+      <div className="pt-3">
+        {hasBankData ? (
+          <div className="grid grid-cols-3 gap-6">
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Bank Account</p>
+              <Row label="Bank Name" value={app.bankName ?? 'Citizens Bank'} />
+              <Row label="Account Number" value={app.maskedAccountNumber ?? '****1234'} />
+              <Row label="Account Type" value={app.bankAccountType ?? 'Checking'} />
+              <Row label="Verified" value={app.bankAccountVerified !== false ? 'Yes' : 'No'} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Cashflow Analysis</p>
+              <Row label="Cashflow Score" value={app.cashflowScore} />
+              <Row label="Avg Monthly Balance" value={app.avgMonthlyBalance ? fmt(app.avgMonthlyBalance) : '\u2014'} />
+              <Row label="Monthly Inflows" value={app.monthlyInflows ? fmt(app.monthlyInflows) : '\u2014'} />
+              <Row label="Monthly Outflows" value={app.monthlyOutflows ? fmt(app.monthlyOutflows) : '\u2014'} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Auto-Pay</p>
+              <Row label="Autopay Enrolled" value={app.autopayEnrolled ? 'Enrolled' : 'Not Enrolled'} />
+              <Row label="Payment Method" value={app.paymentMethod ?? 'ACH'} />
+              <Row label="Next Payment" value={fmtDate(app.nextPaymentDate)} />
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-6 text-gray-400">
+            <p className="text-sm">Open Banking verification has not been completed yet.</p>
+            <p className="text-xs mt-1">Bank account details and cashflow analysis will appear here once the applicant connects their account.</p>
+          </div>
+        )}
+      </div>
+    </Section>
+  )
+}
+
+/* --- 5. Credit Decisioning --- */
+function CreditDecisioningSection({ app }) {
+  const hasCreditData = app.creditScore != null
+  return (
+    <Section
+      title="Credit Decisioning"
+      icon={'\ud83d\udcca'}
+      badge={app.creditDecisionType ? <StatusBadge status={app.creditDecisionType} /> : null}
+    >
+      <div className="pt-3">
+        {hasCreditData ? (
+          <>
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              <MetricTile
+                label="Credit Score"
+                value={app.creditScore}
+                color={scoreColor(app.creditScore, [740, 620])}
+                sub={app.creditScore >= 740 ? 'Good\u2013Excellent' : app.creditScore >= 620 ? 'Fair' : 'Below Threshold'}
+              />
+              <MetricTile
+                label="DTI Ratio"
+                value={app.dti != null ? `${Number(app.dti).toFixed(1)}%` : null}
+                color={dtiColor(app.dti)}
+                sub={app.dti != null ? (app.dti < 30 ? 'Low risk' : app.dti < 43 ? 'Moderate' : 'High risk') : null}
+              />
+              <MetricTile
+                label="CLTV Ratio"
+                value={app.cltv != null ? `${Number(app.cltv).toFixed(1)}%` : null}
+                color={cltvColor(app.cltv)}
+                sub={app.cltv != null ? (app.cltv < 80 ? 'Low risk' : app.cltv < 90 ? 'Moderate' : 'High risk') : null}
+              />
+              <MetricTile
+                label="Interest Rate"
+                value={app.interestRate != null ? `${Number(app.interestRate).toFixed(2)}%` : null}
+                color="text-gray-800"
+                sub={app.interestRate != null ? (app.interestRate < 7 ? 'Below avg' : app.interestRate < 10 ? 'Market rate' : 'Above avg') : null}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Credit Bureau Data</p>
+                <Row label="Credit Score" value={app.creditScore} />
+                <Row label="Credit Bureau" value={app.creditBureau ?? 'TransUnion'} />
+                <Row label="Report Date" value={fmtDate(app.creditReportDate ?? app.submittedAt)} />
+                <Row label="Open Tradelines" value={app.openTradelines ?? '\u2014'} />
+                <Row label="Derogatory Marks" value={app.derogatoryMarks ?? '0'} />
+                <Row label="Credit Utilization" value={app.creditUtilization != null ? `${app.creditUtilization}%` : '\u2014'} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Decision Details</p>
+                <Row label="Decision Type" value={app.creditDecisionType} />
+                <Row label="Decision Reason" value={app.decisionReason} />
+                <Row label="DTI Ratio" value={app.dti != null ? `${Number(app.dti).toFixed(1)}%` : '\u2014'} />
+                <Row label="CLTV Ratio" value={app.cltv != null ? `${Number(app.cltv).toFixed(1)}%` : '\u2014'} />
+                <Row label="Risk Grade" value={app.riskGrade ?? (app.creditScore >= 740 ? 'A' : app.creditScore >= 680 ? 'B' : app.creditScore >= 620 ? 'C' : 'D')} />
+                <Row label="Max Approved Line" value={app.maxApprovedLine ? fmt(app.maxApprovedLine) : '\u2014'} />
+              </div>
+            </div>
+
+            {/* Decision Trail */}
+            <div className="mt-4 bg-gray-50 rounded-lg border border-gray-100 px-4 py-3">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Decision Trail</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <DecisionChip label="Credit" value={app.creditDecisionType} />
+                {app.appraisedValue != null && <>
+                  <span className="text-gray-300 text-lg">&rarr;</span>
+                  <DecisionChip label="Appraisal" value="APPRAISED" />
+                </>}
+                {(app.cashflowScore != null || app.bankName != null) && <>
+                  <span className="text-gray-300 text-lg">&rarr;</span>
+                  <DecisionChip label="Banking" value="CONNECTED" />
+                </>}
+                {app.underwritingRecommendation && <>
+                  <span className="text-gray-300 text-lg">&rarr;</span>
+                  <DecisionChip label="Underwriting" value={app.underwritingRecommendation} />
+                </>}
+                {app.helocAccountNumber && <>
+                  <span className="text-gray-300 text-lg">&rarr;</span>
+                  <DecisionChip label="Booking" value="BOOKED" />
+                </>}
+                <span className="flex-1" />
+                {app.decisionReason && (
+                  <p className="text-xs text-gray-500 italic max-w-xs text-right">{app.decisionReason}</p>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-6 text-gray-400">
+            <p className="text-sm">Credit decision has not been run yet.</p>
+            <p className="text-xs mt-1">Credit score, DTI, CLTV ratios and the decision will appear here after the credit check is performed.</p>
+          </div>
+        )}
+      </div>
+    </Section>
+  )
+}
+
+/* --- 6. Underwriting --- */
+function UnderwritingSection({ app }) {
+  const hasUwData = app.underwritingRecommendation != null || app.cashflowScore != null
+  return (
+    <Section
+      title="Underwriting"
+      icon={'\ud83d\udccb'}
+      badge={app.underwritingRecommendation ? <StatusBadge status={app.underwritingRecommendation} /> : null}
+    >
+      <div className="pt-3">
+        {hasUwData ? (
+          <div className="grid grid-cols-3 gap-6">
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Risk Assessment</p>
+              <Row label="Cashflow Score" value={app.cashflowScore} />
+              <Row label="Credit Score" value={app.creditScore} />
+              <Row label="DTI Ratio" value={app.dti != null ? `${Number(app.dti).toFixed(1)}%` : '\u2014'} />
+              <Row label="CLTV Ratio" value={app.cltv != null ? `${Number(app.cltv).toFixed(1)}%` : '\u2014'} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Property Assessment</p>
+              <Row label="Appraised Value" value={app.appraisedValue ? fmt(app.appraisedValue) : '\u2014'} />
+              <Row label="Flood Zone" value={app.floodZoneStatus ?? 'N/A'} />
+              <Row label="Title Clear" value={app.titleClear !== false ? 'Yes' : 'No'} />
+              <Row label="Insurance Verified" value={app.insuranceVerified !== false ? 'Yes' : 'Pending'} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Decision</p>
+              <Row label="Recommendation" value={app.underwritingRecommendation} />
+              <Row label="Risk Grade" value={app.riskGrade ?? (app.creditScore >= 740 ? 'A' : app.creditScore >= 680 ? 'B' : app.creditScore >= 620 ? 'C' : 'D')} />
+              <Row label="Conditions" value={app.underwritingConditions ?? 'None'} />
+              <Row label="Review Date" value={fmtDate(app.underwritingDate ?? app.submittedAt)} />
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-6 text-gray-400">
+            <p className="text-sm">Underwriting has not been completed yet.</p>
+            <p className="text-xs mt-1">Risk assessment, property evaluation, and the underwriting recommendation will appear here.</p>
+          </div>
+        )}
+      </div>
+    </Section>
+  )
+}
+
+/* --- Reprocess Panel --- */
 const SSN_OPTIONS = [
   { ssn: '555-55-5555', score: 800, label: 'Excellent',  outcome: 'Approve',       color: 'text-green-700' },
   { ssn: '444-44-4444', score: 740, label: 'Good',       outcome: 'Approve',       color: 'text-green-700' },
@@ -242,6 +464,7 @@ function ReprocessPanel({ appId, onComplete }) {
   )
 }
 
+/* --- Outcome Banner --- */
 function OutcomeBanner({ app }) {
   if (app.status === 'BOOKED') return (
     <div className="my-4 bg-green-50 border border-green-300 rounded-xl px-5 py-4 flex items-start gap-3">
@@ -281,6 +504,7 @@ function OutcomeBanner({ app }) {
   return null
 }
 
+/* === Main Application Detail Page === */
 export default function ApplicationDetailPage() {
   const { id } = useParams()
   const [app, setApp] = useState(null)
@@ -300,22 +524,16 @@ export default function ApplicationDetailPage() {
   if (error) return <div className="bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-3 text-sm">{error}</div>
   if (!app) return null
 
-  const ap   = app.applicant
-  const prop = app.propertyInfo
-
-  const hasCreditData    = app.creditScore != null
-  const hasAppraisalData = app.appraisedValue != null
-  const hasUwData        = app.cashflowScore != null
-  const hasBookingData   = app.helocAccountNumber != null
-
   return (
     <div>
+      {/* Back link */}
       <Link to="/applications" className="text-sm text-citizens-green hover:underline mb-4 inline-block">&larr; All Applications</Link>
 
+      {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {ap ? `${ap.firstName} ${ap.lastName}` : 'Application'}
+            {app.applicant ? `${app.applicant.firstName} ${app.applicant.lastName}` : 'Application'}
           </h1>
           <p className="text-gray-400 text-xs mt-0.5 font-mono">{id}</p>
         </div>
@@ -325,95 +543,27 @@ export default function ApplicationDetailPage() {
         </div>
       </div>
 
+      {/* Outcome banner */}
       <OutcomeBanner app={app} />
 
+      {/* Reprocess panel for MANUAL_REVIEW / DENIED */}
       {(app.status === 'MANUAL_REVIEW' || app.status === 'DENIED') && (
         <ReprocessPanel appId={app.id} onComplete={setApp} />
       )}
 
+      {/* Counter offer for MANUAL_REVIEW / DENIED */}
       {(app.status === 'DENIED' || app.status === 'MANUAL_REVIEW') && (
         <CounterOfferPanel appId={app.id} status={app.status} />
       )}
 
-      {app.status === 'MANUAL_REVIEW' && <DocumentUploadPanel appId={app.id} applicant={app.applicant} />}
+      {/* Pipeline tracker */}
+      <PipelineTracker status={app.status} banked={app.appraisedValue != null} />
 
-      {app.status === 'BOOKED' && <ESignPanel appId={app.id} />}
-      {app.status === 'BOOKED' && <LienRecordingPanel app={app} />}
-
-      <PipelineTracker status={app.status} banked={hasAppraisalData} />
-
-      {hasCreditData && <UnderwriterSummary app={app} />}
-
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        {hasCreditData && (
-          <Card title="Credit Decision">
-            <Row label="Credit Score" value={app.creditScore} />
-            <Row label="DTI" value={app.dti != null ? `${Number(app.dti).toFixed(1)}%` : '\u2014'} />
-            <Row label="CLTV" value={app.cltv != null ? `${Number(app.cltv).toFixed(1)}%` : '\u2014'} />
-            <Row label="Interest Rate" value={app.interestRate != null ? `${Number(app.interestRate).toFixed(2)}%` : '\u2014'} />
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-sm text-gray-500">Decision:</span>
-              <StatusBadge status={app.creditDecisionType} />
-            </div>
-          </Card>
-        )}
-
-        {hasAppraisalData && (
-          <Card title="Property Appraisal">
-            <Row label="Appraised Value" value={fmt(app.appraisedValue)} />
-            <Row label="Appraisal Date" value={fmtDate(app.appraisalDate)} />
-            <Row label="CLTV Ratio" value={app.cltv != null ? `${Number(app.cltv).toFixed(1)}%` : '\u2014'} />
-            <Row label="Flood Zone" value={app.floodZoneStatus ?? 'N/A'} />
-          </Card>
-        )}
-
-        {hasUwData && (
-          <Card title="Underwriting">
-            <Row label="Cashflow Score" value={app.cashflowScore} />
-            <Row label="Recommendation" value={app.underwritingRecommendation} />
-          </Card>
-        )}
-
-        {hasBookingData && (
-          <Card title="HELOC Account">
-            <Row label="HELOC Account #" value={app.helocAccountNumber} />
-            <Row label="Credit Line" value={fmt(app.requestedCreditLine)} />
-            <Row label="Monthly Payment" value={fmt(app.monthlyPayment)} />
-            <Row label="Account Status" value={app.loanStatus ?? app.helocStatus} />
-          </Card>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        {ap && (
-          <Card title="Applicant">
-            <Row label="Name" value={`${ap.firstName} ${ap.lastName}`} />
-            <Row label="DOB" value={fmtDate(ap.dob)} />
-            <Row label="Email" value={ap.email} />
-            <Row label="Phone" value={ap.phone} />
-            <Row label="Employment" value={ap.employmentType?.replace(/_/g, ' ')} />
-            <Row label="Annual Income" value={fmt(ap.annualIncome)} />
-            <Row label="Monthly Housing" value={fmt(ap.monthlyHousingPayment)} />
-          </Card>
-        )}
-
-        {prop && (
-          <Card title="Property">
-            <PropertyImage address={`${prop.propertyAddress}, ${prop.propertyCity}, ${prop.propertyState}`} />
-            <Row label="Address" value={`${prop.propertyAddress}, ${prop.propertyCity}, ${prop.propertyState} ${prop.propertyZip}`} />
-            <Row label="Type" value={prop.propertyType?.replace(/_/g, ' ')} />
-            <Row label="Est. Value" value={fmt(prop.estimatedPropertyValue)} />
-            <Row label="Mortgage Balance" value={fmt(prop.currentMortgageBalance)} />
-            <Row label="Year Built" value={prop.yearBuilt} />
-            <Row label="Sq Ft" value={prop.squareFootage?.toLocaleString()} />
-          </Card>
-        )}
-      </div>
-
-      <div className="mt-4 bg-citizens-green-light border border-citizens-green rounded-xl px-5 py-4 flex gap-8">
+      {/* HELOC summary bar */}
+      <div className="mb-4 bg-citizens-green-light border border-citizens-green rounded-xl px-5 py-4 flex gap-8 flex-wrap">
         <div>
           <p className="text-xs text-citizens-green font-medium uppercase tracking-wide">Credit Line</p>
-          <p className="text-xl font-bold text-citizens-navy">{fmt(app.requestedCreditLine)}</p>
+          <p className="text-xl font-bold text-citizens-navy">{fmt(app.requestedCreditLine ?? app.loanAmount)}</p>
         </div>
         <div>
           <p className="text-xs text-citizens-green font-medium uppercase tracking-wide">Draw Period</p>
@@ -429,7 +579,81 @@ export default function ApplicationDetailPage() {
             <p className="text-xl font-bold text-citizens-navy">{Number(app.interestRate).toFixed(2)}%</p>
           </div>
         )}
+        {app.monthlyPayment != null && (
+          <div>
+            <p className="text-xs text-citizens-green font-medium uppercase tracking-wide">Monthly Payment</p>
+            <p className="text-xl font-bold text-citizens-navy">{fmt(app.monthlyPayment)}</p>
+          </div>
+        )}
+        <div className="ml-auto flex items-center">
+          <StatusBadge status={app.status} />
+        </div>
       </div>
+
+      {/* 1. Customer Demographics */}
+      <CustomerDemographicsSection applicant={app.applicant} />
+
+      {/* 2. Property Information */}
+      <PropertyInfoSection propertyInfo={app.propertyInfo} app={app} />
+
+      {/* 3. HELOC Loan Information */}
+      <LoanInfoSection app={app} />
+
+      {/* 4. Open Banking */}
+      <OpenBankingSection app={app} />
+
+      {/* 5. Credit Decisioning */}
+      <CreditDecisioningSection app={app} />
+
+      {/* 6. Underwriting */}
+      <UnderwritingSection app={app} />
+
+      {/* 7. Document Upload & OCR */}
+      <Section title="Document Upload & OCR" icon={'\ud83d\udcc4'}>
+        <div className="pt-1">
+          <DocumentUploadPanel appId={app.id} applicant={app.applicant} />
+        </div>
+      </Section>
+
+      {/* 8. E-Signature Integration */}
+      <Section
+        title="E-Signature Integration"
+        icon={'\u270d\ufe0f'}
+        badge={app.status === 'BOOKED'
+          ? <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Available</span>
+          : <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-500">Pending Approval</span>}
+      >
+        <div className="pt-1">
+          {app.status === 'BOOKED' ? (
+            <ESignPanel appId={app.id} />
+          ) : (
+            <div className="text-center py-6 text-gray-400">
+              <p className="text-sm">E-Signature is available after HELOC approval.</p>
+              <p className="text-xs mt-1">Once the application is approved and booked, HELOC closing documents can be sent for electronic signature.</p>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* 9. Lien Recording */}
+      <Section
+        title="Lien Recording"
+        icon={'\ud83c\udfe2'}
+        badge={app.status === 'BOOKED'
+          ? <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Available</span>
+          : <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-500">Pending Approval</span>}
+      >
+        <div className="pt-1">
+          {app.status === 'BOOKED' ? (
+            <LienRecordingPanel app={app} />
+          ) : (
+            <div className="text-center py-6 text-gray-400">
+              <p className="text-sm">Lien recording is available after HELOC approval.</p>
+              <p className="text-xs mt-1">Once the HELOC is booked, a lien can be filed against the property with the county recorder.</p>
+            </div>
+          )}
+        </div>
+      </Section>
     </div>
   )
 }

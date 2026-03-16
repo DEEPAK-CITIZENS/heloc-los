@@ -10,6 +10,13 @@ import PreQualPage from './pages/PreQualPage'
 import PortfolioPage from './pages/PortfolioPage'
 import PreApprovalsPage from './pages/PreApprovalsPage'
 import ConfigPage from './pages/ConfigPage'
+import CreditDecisioningPage from './pages/CreditDecisioningPage'
+import PropertyAppraisalPage from './pages/PropertyAppraisalPage'
+import UnderwritingPage from './pages/UnderwritingPage'
+import HelocBookingPage from './pages/HelocBookingPage'
+import LienRecordingServicePage from './pages/LienRecordingServicePage'
+import OfacScreeningPage from './pages/OfacScreeningPage'
+import ESignServicePage from './pages/ESignServicePage'
 
 export default function App() {
   return (
@@ -28,6 +35,13 @@ export default function App() {
             <Route path="/portfolio" element={<PortfolioPage />} />
             <Route path="/pre-approvals" element={<PreApprovalsPage />} />
             <Route path="/config" element={<ConfigPage />} />
+            <Route path="/services/credit-decisioning" element={<CreditDecisioningPage />} />
+            <Route path="/services/property-appraisal" element={<PropertyAppraisalPage />} />
+            <Route path="/services/underwriting" element={<UnderwritingPage />} />
+            <Route path="/services/heloc-booking" element={<HelocBookingPage />} />
+            <Route path="/services/lien-recording" element={<LienRecordingServicePage />} />
+            <Route path="/services/ofac-screening" element={<OfacScreeningPage />} />
+            <Route path="/services/esign" element={<ESignServicePage />} />
           </Routes>
         </main>
       </div>

@@ -126,30 +126,10 @@ export default function NewApplicationPage() {
     setError(null)
     setSubmitting(true)
     try {
+      const fullAddress = [property.propertyAddress, property.propertyCity, property.propertyState, property.propertyZip].filter(Boolean).join(', ')
       const payload = {
-        applicant: {
-          ...applicant,
-          annualIncome: parseFloat(applicant.annualIncome) || 0,
-          monthlyHousingPayment: parseFloat(applicant.monthlyHousingPayment) || 0,
-        },
-        propertyInfo: {
-          ...property,
-          estimatedPropertyValue: parseFloat(property.estimatedPropertyValue) || 0,
-          currentMortgageBalance: parseFloat(property.currentMortgageBalance) || 0,
-          yearBuilt: parseInt(property.yearBuilt) || 0,
-          squareFootage: parseInt(property.squareFootage) || 0,
-          propertyTaxAnnual: parseFloat(property.propertyTaxAnnual) || 0,
-          homeInsuranceAnnual: parseFloat(property.homeInsuranceAnnual) || 0,
-          hoaMonthly: parseFloat(property.hoaMonthly) || 0,
-        },
-        requestedCreditLine: parseFloat(heloc.requestedCreditLine) || 0,
-        drawPeriodYears: parseInt(heloc.drawPeriodYears),
-        repaymentPeriodYears: parseInt(heloc.repaymentPeriodYears),
-        intendedUse: heloc.intendedUse,
-      }
-
-      if (preApproval?.offerCode) {
-        payload.preApprovalOfferCode = preApproval.offerCode
+        loanAmount: parseFloat(heloc.requestedCreditLine) || 0,
+        propertyAddress: fullAddress || applicant.address,
       }
 
       const result = await submitApplication(payload)

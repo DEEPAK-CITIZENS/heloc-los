@@ -4,16 +4,16 @@ const api = axios.create({ baseURL: '/api', headers: { 'Content-Type': 'applicat
 
 // HELOC Application CRUD
 export function submitApplication(payload) {
-  return api.post('/heloc-application', payload).then(r => r.data)
+  return api.post('/application', payload).then(r => r.data)
 }
 export function getApplications() {
-  return api.get('/heloc-application').then(r => r.data)
+  return api.get('/application').then(r => r.data)
 }
 export function getApplication(id) {
-  return api.get(`/heloc-application/${id}`).then(r => r.data)
+  return api.get(`/application/${id}`).then(r => r.data)
 }
 export function reprocessApplication(id, ssn) {
-  return api.post(`/heloc-application/${id}/reprocess`, { ssn }).then(r => r.data)
+  return api.post(`/application/${id}/reprocess`, { ssn }).then(r => r.data)
 }
 
 // Document upload (same pattern as auto-loan)
@@ -21,33 +21,33 @@ export async function uploadDocument(appId, documentType, file) {
   const formData = new FormData()
   formData.append('documentType', documentType)
   formData.append('file', file)
-  const { data } = await api.post(`/heloc-application/${appId}/documents`, formData, {
+  const { data } = await api.post(`/application/${appId}/documents`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
   return data
 }
 export async function getDocuments(appId) {
-  const { data } = await api.get(`/heloc-application/${appId}/documents`)
+  const { data } = await api.get(`/application/${appId}/documents`)
   return data
 }
 
 // Pre-qualification & Deal Structuring
 export function preQualify(payload) {
-  return api.post('/heloc-pre-qual', payload).then(r => r.data)
+  return api.post('/application/pre-qual', payload).then(r => r.data)
 }
 export function dealStructure(payload) {
-  return api.post('/heloc-deal-structure', payload).then(r => r.data)
+  return api.post('/application/deal-structure', payload).then(r => r.data)
 }
 export function getAllApplications() {
-  return api.get('/heloc-application?all=true').then(r => r.data)
+  return api.get('/application?all=true').then(r => r.data)
 }
 
 // Counter-Offer & Adverse Action
 export function getCounterOffer(id) {
-  return api.get(`/heloc-application/${id}/counter-offer`).then(r => r.data)
+  return api.get(`/application/${id}/counter-offer`).then(r => r.data)
 }
 export function getAdverseActionNoticeUrl(id) {
-  return `/api/heloc-application/${id}/adverse-action-notice`
+  return `/api/application/${id}/adverse-action-notice`
 }
 
 // Lien Recording (replaces Title Transfer)
@@ -76,6 +76,61 @@ export async function getEsignStatus(applicationId) {
 const portfolioApi = axios.create({ baseURL: '/portfolio-api', headers: { 'Content-Type': 'application/json' } })
 export async function getPortfolioMetrics() {
   const { data } = await portfolioApi.get('/heloc-portfolio/metrics')
+  return data
+}
+
+// Credit Decisioning
+const creditApi = axios.create({ baseURL: '/credit-api', headers: { 'Content-Type': 'application/json' } })
+export async function runCreditDecision(payload) {
+  const { data } = await creditApi.post('/credit-decision', payload)
+  return data
+}
+export async function getCreditDecision(applicationId) {
+  const { data } = await creditApi.get(`/credit-decision/${applicationId}`)
+  return data
+}
+
+// Property Appraisal
+const appraisalApi = axios.create({ baseURL: '/appraisal-api', headers: { 'Content-Type': 'application/json' } })
+export async function runPropertyAppraisal(payload) {
+  const { data } = await appraisalApi.post('/property-appraisal', payload)
+  return data
+}
+export async function getPropertyAppraisal(applicationId) {
+  const { data } = await appraisalApi.get(`/property-appraisal/${applicationId}`)
+  return data
+}
+
+// Underwriting
+const underwritingApi = axios.create({ baseURL: '/underwriting-api', headers: { 'Content-Type': 'application/json' } })
+export async function runUnderwriting(payload) {
+  const { data } = await underwritingApi.post('/underwriting', payload)
+  return data
+}
+export async function getUnderwritingResult(applicationId) {
+  const { data } = await underwritingApi.get(`/underwriting/${applicationId}`)
+  return data
+}
+
+// HELOC Booking
+const bookingApi = axios.create({ baseURL: '/booking-api', headers: { 'Content-Type': 'application/json' } })
+export async function bookHeloc(payload) {
+  const { data } = await bookingApi.post('/booked-heloc', payload)
+  return data
+}
+export async function getBookedHeloc(applicationId) {
+  const { data } = await bookingApi.get(`/booked-heloc/${applicationId}`)
+  return data
+}
+
+// OFAC Screening
+const ofacApi = axios.create({ baseURL: '/ofac-api', headers: { 'Content-Type': 'application/json' } })
+export async function runOfacScreening(payload) {
+  const { data } = await ofacApi.post('/ofac-screening', payload)
+  return data
+}
+export async function getOfacScreening(applicationId) {
+  const { data } = await ofacApi.get(`/ofac-screening/${applicationId}`)
   return data
 }
 
